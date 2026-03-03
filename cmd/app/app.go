@@ -14,8 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/danielkov/gin-helmet/ginhelmet"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -56,23 +54,10 @@ func (a *App) Initializar() error {
 
 	router := gin.New()
 
-	// Middleware para activar los logs a los servicios
-	router.Use(gin.Logger())
-
-	// Middleware para error handling global
-	router.Use(middlewares.ErrorHandlerMiddleware())
-	logger.General("Error handler global configurado")
-
-	// Middleare para que panic handler
-	router.Use(gin.Recovery())
-
-	// Agregamos middlewares headers de seguridad (OWASP top 10)
-	router.Use(ginhelmet.Default())
-	logger.Success("Headers de seguridad configurados para entorno: " + env)
-
-	// Agregamos middleware CORS global
-	router.Use(cors.Default())
-	logger.Success("CORS configurado para entorno: " + env)
+	middlewares.Register(router, middlewares.Options{
+		Environment:    env,
+		AllowedOrigins: cfg.AllowedOrigins,
+	})
 
 	// Después de configurar middlewares
 	container := container.NewContainer()
