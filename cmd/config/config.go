@@ -31,6 +31,7 @@ type Configuracion struct {
 	SupabaseJWKSURL     string `env:"SUPABASE_JWKS_URL"`
 	SupabaseJWTIssuer   string `env:"SUPABASE_JWT_ISSUER"`
 	SupabaseJWTAudience string `env:"SUPABASE_JWT_AUDIENCE"`
+	SupabaseServiceRole string `env:"SUPABASE_SERVICE_ROLE_KEY"`
 }
 
 func CargarVariables() (*Configuracion, error) {

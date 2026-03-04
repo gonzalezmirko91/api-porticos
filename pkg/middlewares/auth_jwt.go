@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -17,10 +18,20 @@ const (
 	ContextUserEmailKey = "auth.user_email"
 )
 
-func AuthJWTMiddleware(verifier *auth.SupabaseVerifier) gin.HandlerFunc {
+type UserRoleResolver interface {
+	ResolveRole(ctx context.Context, supabaseUserID string) (string, error)
+}
+
+func AuthJWTMiddleware(verifier *auth.SupabaseVerifier, roleResolver UserRoleResolver) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Health endpoint público
 		if c.Request.Method == http.MethodGet && c.Request.URL.Path == "/api/v1/health" {
+			c.Next()
+			return
+		}
+		// Endpoints públicos de cuentas
+		if c.Request.Method == http.MethodPost && (c.Request.URL.Path == "/api/v1/accounts/signup" ||
+			c.Request.URL.Path == "/api/v1/accounts") {
 			c.Next()
 			return
 		}
@@ -49,8 +60,22 @@ func AuthJWTMiddleware(verifier *auth.SupabaseVerifier) gin.HandlerFunc {
 			return
 		}
 
+		resolvedRole := strings.ToLower(strings.TrimSpace(claims.Role))
+		if roleResolver != nil {
+			roleFromDB, err := roleResolver.ResolveRole(c.Request.Context(), claims.Subject)
+			if err != nil {
+				respondAuthError(c, err)
+				return
+			}
+			resolvedRole = strings.ToLower(strings.TrimSpace(roleFromDB))
+		}
+		if resolvedRole == "" {
+			respondAuthError(c, domainErrors.NewForbiddenError("ROLE_REQUIRED", "perfil no autorizado"))
+			return
+		}
+
 		c.Set(ContextUserIDKey, claims.Subject)
-		c.Set(ContextUserRoleKey, claims.Role)
+		c.Set(ContextUserRoleKey, resolvedRole)
 		c.Set(ContextUserEmailKey, claims.Email)
 		c.Next()
 	}

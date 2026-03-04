@@ -23,7 +23,7 @@ func Register(router *gin.Engine, opts Options) {
 		opts.SupabaseJWTIssuer,
 		opts.SupabaseJWTAudience,
 	)
-	router.Use(AuthJWTMiddleware(verifier))
+	router.Use(AuthJWTMiddleware(verifier, opts.RoleResolver))
 
 	corsCfg := cors.Config{
 		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},

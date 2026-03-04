@@ -9,6 +9,7 @@ import (
 	configuracion "rea/porticos/cmd/config"
 	"rea/porticos/cmd/container"
 	"rea/porticos/cmd/routes"
+	"rea/porticos/pkg/authz"
 	"rea/porticos/pkg/db"
 	"rea/porticos/pkg/logger"
 	"rea/porticos/pkg/middlewares"
@@ -57,6 +58,10 @@ func (a *App) Initializar() error {
 		strings.TrimSpace(cfg.SupabaseJWTAudience) == "" {
 		return fmt.Errorf("faltan variables SUPABASE_JWKS_URL, SUPABASE_JWT_ISSUER o SUPABASE_JWT_AUDIENCE")
 	}
+	if strings.TrimSpace(cfg.SupabaseURL) == "" ||
+		strings.TrimSpace(cfg.SupabaseServiceRole) == "" {
+		return fmt.Errorf("faltan variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -82,6 +87,7 @@ func (a *App) Initializar() error {
 	logger.General("Servidor HTTP Configurado")
 
 	router := gin.New()
+	roleResolver := authz.NewPostgresUserRoleResolver(a.db.Pool)
 
 	middlewares.Register(router, middlewares.Options{
 		Environment:         env,
@@ -89,10 +95,11 @@ func (a *App) Initializar() error {
 		SupabaseJWKSURL:     cfg.SupabaseJWKSURL,
 		SupabaseJWTIssuer:   cfg.SupabaseJWTIssuer,
 		SupabaseJWTAudience: cfg.SupabaseJWTAudience,
+		RoleResolver:        roleResolver,
 	})
 
 	// Después de configurar middlewares
-	container := container.NewContainer(a.db)
+	container := container.NewContainer(a.db, cfg)
 	apiRouter := routes.NewAPIRouter(container)
 	apiRouter.RegisterRoutes(router)
 

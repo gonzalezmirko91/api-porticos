@@ -99,13 +99,17 @@ func (v *SupabaseVerifier) Verify(ctx context.Context, token string) (*Claims, e
 	}
 
 	var raw struct {
-		Sub   string          `json:"sub"`
-		Role  string          `json:"role"`
-		Email string          `json:"email"`
-		Iss   string          `json:"iss"`
-		Aud   json.RawMessage `json:"aud"`
-		Exp   int64           `json:"exp"`
-		Nbf   int64           `json:"nbf"`
+		Sub         string          `json:"sub"`
+		Role        string          `json:"role"`
+		Email       string          `json:"email"`
+		Iss         string          `json:"iss"`
+		Aud         json.RawMessage `json:"aud"`
+		Exp         int64           `json:"exp"`
+		Nbf         int64           `json:"nbf"`
+		AppMetadata struct {
+			Role    string `json:"role"`
+			APIRole string `json:"api_role"`
+		} `json:"app_metadata"`
 	}
 	if err := json.Unmarshal(claimsBytes, &raw); err != nil {
 		return nil, errors.New("claims JWT inválidos")
@@ -128,11 +132,31 @@ func (v *SupabaseVerifier) Verify(ctx context.Context, token string) (*Claims, e
 		return nil, errors.New("subject inválido")
 	}
 
+	resolvedRole := resolveRole(raw.Role, raw.AppMetadata.Role, raw.AppMetadata.APIRole)
+
 	return &Claims{
 		Subject: raw.Sub,
-		Role:    raw.Role,
+		Role:    resolvedRole,
 		Email:   raw.Email,
 	}, nil
+}
+
+func resolveRole(claimRole, appMetadataRole, apiRole string) string {
+	// Precedencia: api_role > app_metadata.role > role claim.
+	role := strings.TrimSpace(apiRole)
+	if role == "" {
+		role = strings.TrimSpace(appMetadataRole)
+	}
+	if role == "" {
+		role = strings.TrimSpace(claimRole)
+	}
+
+	role = strings.ToLower(role)
+	if role == "authenticated" {
+		// Rol por defecto de Supabase para usuarios logueados.
+		return "reader"
+	}
+	return role
 }
 
 func audienceMatches(raw json.RawMessage, expected string) bool {
