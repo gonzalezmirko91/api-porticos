@@ -19,6 +19,13 @@ type Configuracion struct {
 	RateLimit          int    `env:"RATE_LIMIT" envDefault:"100" validate:"gte=1,lte=10000"`
 	RateLimitWindowSec int    `env:"RATE_LIMIT_WINDOW_SEC" envDefault:"60" validate:"gte=1,lte=3600"`
 	AllowedOrigins     string `env:"ALLOWED_ORIGINS" envDefault:"http://localhost:3000"`
+
+	DBHost     string `env:"DB_HOST" envDefault:"localhost"`
+	DBPort     int    `env:"DB_PORT" envDefault:"5432"`
+	DBUser     string `env:"DB_USER,required"`
+	DBPassword string `env:"DB_PASSWORD,required"`
+	DBName     string `env:"DB_NAME,required"`
+	DBSSLMode  string `env:"DB_SSL_MODE" envDefault:"disable" validate:"oneof=disable require verify-ca verify-full"`
 }
 
 func CargarVariables() (*Configuracion, error) {

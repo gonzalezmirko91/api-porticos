@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: api_porticos_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-porticos_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-porticos_pass}
+      POSTGRES_DB: ${DB_NAME:-porticos_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-porticos_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

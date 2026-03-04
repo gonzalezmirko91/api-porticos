@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	configuracion "rea/porticos/cmd/config"
 	"rea/porticos/cmd/container"
 	"rea/porticos/cmd/routes"
+	"rea/porticos/pkg/db"
 	"rea/porticos/pkg/logger"
 	"rea/porticos/pkg/middlewares"
 	"strconv"
@@ -22,6 +24,7 @@ type App struct {
 	config *configuracion.Configuracion
 	router *gin.Engine
 	log    *zap.Logger
+	db     *db.Postgres
 }
 
 func NewApp() *App {
@@ -48,7 +51,27 @@ func (a *App) Initializar() error {
 		return err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pg, err := db.NewPostgres(
+		ctx,
+		cfg.DBHost,
+		cfg.DBPort,
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBName,
+		cfg.DBSSLMode,
+	)
+
+	if err != nil {
+		return fmt.Errorf("db init failed: %w", err)
+	}
+
+	a.db = pg
 	a.config = cfg
+	a.config = cfg
+	logger.Success("Conexión a PostgreSQL validada")
 	logger.Success("Configuración cargada correctamente")
 	logger.General("Servidor HTTP Configurado")
 

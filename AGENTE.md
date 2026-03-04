@@ -149,3 +149,45 @@ Dependencias permitidas:
 - No agregar ni modificar archivos a menos que el desarrollador lo decida
 - Siempre muestra la respuesta como deberia verse el archivo de forma correcta
 - Valida que se respeten las reglas de seguridad
+
+## Contexto de negocio y propósito comercial
+
+Esta API no solo servirá para consumo interno de la app móvil, sino que debe quedar preparada para operar como producto digital en el futuro (unidad de negocio), con consumo controlado por terceros (clientes externos, partners o integraciones).
+
+Objetivo:
+
+- Exponer pórticos y su información tarifaria de forma segura, trazable y escalable.
+- Permitir monetización futura por consumo de API (planes, cuotas y gobernanza de uso).
+
+## Dominio funcional esperado (MVP+)
+
+La API debe permitir consultar:
+
+- Pórticos:
+  - `codigo` (único)
+  - `nombre`
+  - `latitude`
+  - `longitude`
+- Tarifas asociadas por:
+  - tipo de vehículo
+  - horario/franja tarifaria
+
+Modelo inicial sugerido:
+
+```json
+{
+  "codigo": "P001",
+  "nombre": "Pórtico Costanera Norte KM 12",
+  "latitude": -33.4123,
+  "longitude": -70.6231,
+  "tarifas": [
+    {
+      "tipoVehiculo": "liviano",
+      "horarios": [
+        { "inicio": "00:00", "fin": "06:59", "monto": 1200 },
+        { "inicio": "07:00", "fin": "09:59", "monto": 2100 }
+      ]
+    }
+  ]
+}
+```
