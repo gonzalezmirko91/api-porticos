@@ -1,0 +1,9 @@
+BEGIN;
+
+DROP TABLE IF EXISTS tarifa_horarios;
+DROP TABLE IF EXISTS tarifas_portico;
+DROP TABLE IF EXISTS porticos;
+
+DROP EXTENSION IF EXISTS "pgcrypto";
+
+COMMIT;
