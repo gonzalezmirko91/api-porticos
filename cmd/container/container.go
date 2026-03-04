@@ -13,6 +13,10 @@ import (
 	porticosUseCases "rea/porticos/internal/modules/porticos/application/use_cases"
 	porticosHandler "rea/porticos/internal/modules/porticos/infraestructure/handler"
 	porticosRoutes "rea/porticos/internal/modules/porticos/infraestructure/routes"
+	vehiculosData "rea/porticos/internal/modules/vehiculos/application/data"
+	vehiculosUseCases "rea/porticos/internal/modules/vehiculos/application/use_cases"
+	vehiculosHandler "rea/porticos/internal/modules/vehiculos/infraestructure/handler"
+	vehiculosRoutes "rea/porticos/internal/modules/vehiculos/infraestructure/routes"
 	"rea/porticos/pkg/db"
 	"rea/porticos/pkg/logger"
 	"time"
@@ -20,9 +24,10 @@ import (
 
 // Container para manejo de inyección de dependencias
 type Container struct {
-	HealthController   *healthController.HealthController
-	PorticosController *porticosHandler.PorticosHandler
-	AccountsController *accountsHandler.AccountsHandler
+	HealthController    *healthController.HealthController
+	PorticosController  *porticosHandler.PorticosHandler
+	AccountsController  *accountsHandler.AccountsHandler
+	VehiculosController *vehiculosHandler.VehiculosHandler
 }
 
 func NewContainer(dbConn *db.Postgres, cfg *configuracion.Configuracion) *Container {
@@ -43,11 +48,17 @@ func NewContainer(dbConn *db.Postgres, cfg *configuracion.Configuracion) *Contai
 	accountsController := accountsHandler.NewAccountsHandler(accountsUseCase)
 	accountsRoutes.ConfigAccountsVersion(accountsController)
 
+	vehiculosRepo := vehiculosData.NewVehiculosPostgresRepository(dbConn.Pool)
+	vehiculosUseCase := vehiculosUseCases.NewVehiculosUseCase(vehiculosRepo)
+	vehiculosController := vehiculosHandler.NewVehiculosHandler(vehiculosUseCase)
+	vehiculosRoutes.ConfigVehiculosVersion(vehiculosController)
+
 	logger.Success("Container de dependencias inicializado...")
 
 	return &Container{
-		HealthController:   healthController,
-		PorticosController: porticosController,
-		AccountsController: accountsController,
+		HealthController:    healthController,
+		PorticosController:  porticosController,
+		AccountsController:  accountsController,
+		VehiculosController: vehiculosController,
 	}
 }
