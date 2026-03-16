@@ -35,11 +35,22 @@ func (uc *VehiculosUseCase) ListByOwner(ctx context.Context, ownerID string, lim
 	return uc.repo.ListByOwner(ctx, ownerID, repository.ListVehiculosFilter{Limit: limit, Offset: offset})
 }
 
+func (uc *VehiculosUseCase) ListAll(ctx context.Context, limit, offset int) ([]entities.Vehiculo, error) {
+	return uc.repo.ListAll(ctx, repository.ListVehiculosFilter{Limit: limit, Offset: offset})
+}
+
 func (uc *VehiculosUseCase) GetByID(ctx context.Context, ownerID, id string) (*entities.Vehiculo, error) {
 	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(id) == "" {
 		return nil, domainErrors.NewValidationError("VEHICULO_REQUIRED_FIELDS", "usuario e id son obligatorios")
 	}
 	return uc.repo.GetByID(ctx, ownerID, id)
+}
+
+func (uc *VehiculosUseCase) GetByIDAny(ctx context.Context, id string) (*entities.Vehiculo, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, domainErrors.NewValidationError("VEHICULO_ID_REQUIRED", "id es obligatorio")
+	}
+	return uc.repo.GetByIDAny(ctx, id)
 }
 
 func (uc *VehiculosUseCase) Update(ctx context.Context, vehiculo *entities.Vehiculo) (*entities.Vehiculo, error) {

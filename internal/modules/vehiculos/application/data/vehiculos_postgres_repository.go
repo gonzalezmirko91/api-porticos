@@ -88,6 +88,44 @@ func (r *VehiculosPostgresRepository) ListByOwner(ctx context.Context, ownerID s
 	return out, nil
 }
 
+func (r *VehiculosPostgresRepository) ListAll(ctx context.Context, filter repository.ListVehiculosFilter) ([]entities.Vehiculo, error) {
+	limit := filter.Limit
+	offset := filter.Offset
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT id::text, owner_supabase_user_id::text, patente, tipo_vehiculo, alias, activo
+		FROM vehiculos
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, domainErrors.NewInternalError("VEHICULO_LIST_ERROR", "error al listar vehículos")
+	}
+	defer rows.Close()
+
+	out := make([]entities.Vehiculo, 0)
+	for rows.Next() {
+		var v entities.Vehiculo
+		if err := rows.Scan(&v.ID, &v.OwnerSupabaseUserID, &v.Patente, &v.TipoVehiculo, &v.Alias, &v.Activo); err != nil {
+			return nil, domainErrors.NewInternalError("VEHICULO_LIST_SCAN_ERROR", "error al leer vehículos")
+		}
+		out = append(out, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, domainErrors.NewInternalError("VEHICULO_LIST_ROWS_ERROR", "error iterando vehículos")
+	}
+	return out, nil
+}
+
 func (r *VehiculosPostgresRepository) GetByID(ctx context.Context, ownerID, id string) (*entities.Vehiculo, error) {
 	ownerID = strings.TrimSpace(ownerID)
 	id = strings.TrimSpace(id)
@@ -103,6 +141,28 @@ func (r *VehiculosPostgresRepository) GetByID(ctx context.Context, ownerID, id s
 		  AND id = $2
 		LIMIT 1
 	`, ownerID, id).Scan(&v.ID, &v.OwnerSupabaseUserID, &v.Patente, &v.TipoVehiculo, &v.Alias, &v.Activo)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domainErrors.NewNotFoundError("VEHICULO_NOT_FOUND", "vehículo no encontrado")
+		}
+		return nil, domainErrors.NewInternalError("VEHICULO_GET_ERROR", "error al obtener vehículo")
+	}
+	return &v, nil
+}
+
+func (r *VehiculosPostgresRepository) GetByIDAny(ctx context.Context, id string) (*entities.Vehiculo, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, domainErrors.NewValidationError("VEHICULO_ID_REQUIRED", "id es obligatorio")
+	}
+
+	var v entities.Vehiculo
+	err := r.pool.QueryRow(ctx, `
+		SELECT id::text, owner_supabase_user_id::text, patente, tipo_vehiculo, alias, activo
+		FROM vehiculos
+		WHERE id = $1
+		LIMIT 1
+	`, id).Scan(&v.ID, &v.OwnerSupabaseUserID, &v.Patente, &v.TipoVehiculo, &v.Alias, &v.Activo)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domainErrors.NewNotFoundError("VEHICULO_NOT_FOUND", "vehículo no encontrado")

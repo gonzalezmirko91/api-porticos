@@ -9,6 +9,7 @@ import (
 
 	usecases "rea/porticos/internal/modules/vehiculos/application/use_cases"
 	requests "rea/porticos/internal/modules/vehiculos/domain/dtos/requests"
+	"rea/porticos/internal/modules/vehiculos/domain/entities"
 	domainErrors "rea/porticos/pkg/errors"
 	httpMapper "rea/porticos/pkg/http"
 	"rea/porticos/pkg/middlewares"
@@ -35,6 +36,7 @@ func (h *VehiculosHandler) List(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	role := getAuthRole(c)
 	limit, err := parseQueryInt(c, "limit", 20)
 	if err != nil {
 		respondError(c, err)
@@ -46,7 +48,12 @@ func (h *VehiculosHandler) List(c *gin.Context) {
 		return
 	}
 
-	items, err := h.uc.ListByOwner(c.Request.Context(), ownerID, limit, offset)
+	var items []entities.Vehiculo
+	if role == "admin" {
+		items, err = h.uc.ListAll(c.Request.Context(), limit, offset)
+	} else {
+		items, err = h.uc.ListByOwner(c.Request.Context(), ownerID, limit, offset)
+	}
 	if err != nil {
 		respondError(c, err)
 		return
@@ -65,8 +72,14 @@ func (h *VehiculosHandler) GetByID(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	role := getAuthRole(c)
 	id := strings.TrimSpace(c.Param("id"))
-	out, err := h.uc.GetByID(c.Request.Context(), ownerID, id)
+	var out *entities.Vehiculo
+	if role == "admin" {
+		out, err = h.uc.GetByIDAny(c.Request.Context(), id)
+	} else {
+		out, err = h.uc.GetByID(c.Request.Context(), ownerID, id)
+	}
 	if err != nil {
 		respondError(c, err)
 		return
@@ -147,6 +160,18 @@ func getAuthUserID(c *gin.Context) (string, error) {
 		return "", domainErrors.NewUnauthorizedError("AUTH_REQUIRED", "usuario no autenticado")
 	}
 	return strings.TrimSpace(userID), nil
+}
+
+func getAuthRole(c *gin.Context) string {
+	raw, ok := c.Get(middlewares.ContextUserRoleKey)
+	if !ok {
+		return ""
+	}
+	role, ok := raw.(string)
+	if !ok {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(role))
 }
 
 func parseQueryInt(c *gin.Context, key string, defaultValue int) (int, error) {
