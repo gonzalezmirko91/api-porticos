@@ -97,7 +97,7 @@ func (r *PostgresPorticoRepository) List(ctx context.Context, filter repository.
 			p.detection_radius_meters
 		FROM porticos p
 		LEFT JOIN concesionarias c ON c.id = p.concesionaria_id
-		ORDER BY created_at DESC
+		ORDER BY p.created_at DESC
 		LIMIT $1 OFFSET $2
 	`, limit, offset)
 	if err != nil {
@@ -158,7 +158,7 @@ func (r *PostgresPorticoRepository) GetByID(ctx context.Context, id string) (*en
 			p.detection_radius_meters
 		FROM porticos p
 		LEFT JOIN concesionarias c ON c.id = p.concesionaria_id
-		WHERE id = $1
+		WHERE p.id = $1
 	`, id).Scan(
 		&p.ID,
 		&p.Codigo,
@@ -206,7 +206,7 @@ func (r *PostgresPorticoRepository) GetByCodigo(ctx context.Context, codigo stri
 			p.detection_radius_meters
 		FROM porticos p
 		LEFT JOIN concesionarias c ON c.id = p.concesionaria_id
-		WHERE codigo = $1
+		WHERE p.codigo = $1
 	`, codigo).Scan(
 		&p.ID,
 		&p.Codigo,
