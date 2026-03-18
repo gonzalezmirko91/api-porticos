@@ -19,9 +19,12 @@ func ConfigPasosVersion(pasosHandler *handler.PasosHandler) {
 
 func RegisterPasosRoutes(rg *gin.RouterGroup, h *handler.PasosHandler) {
 	allowed := middlewares.RequireRoles("reader", "partner", "admin")
+	adminOnly := middlewares.RequireRoles("admin")
 
 	rg.POST("", allowed, h.Create)
+	rg.POST("/batch", allowed, h.CreateBatch)
 	rg.GET("", allowed, h.List)
+	rg.GET("/admin", adminOnly, h.ListAll)
 	rg.GET("/resumen", allowed, h.Summary)
 	rg.GET("/:id", allowed, h.GetByID)
 }

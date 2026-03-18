@@ -60,6 +60,74 @@ func (r *PasosPostgresRepository) Create(ctx context.Context, paso *entities.Pas
 	return r.GetByID(ctx, paso.OwnerSupabaseUserID, paso.ID)
 }
 
+func (r *PasosPostgresRepository) CreateBatch(ctx context.Context, pasos []*entities.PasoPortico) ([]entities.PasoPortico, error) {
+	if len(pasos) == 0 {
+		return nil, domainErrors.NewValidationError("PASO_BATCH_EMPTY", "items es obligatorio")
+	}
+
+	ownerID := strings.TrimSpace(pasos[0].OwnerSupabaseUserID)
+	if ownerID == "" {
+		return nil, domainErrors.NewValidationError("PASO_OWNER_REQUIRED", "usuario no autenticado")
+	}
+
+	for i := range pasos {
+		if pasos[i] == nil {
+			return nil, domainErrors.NewValidationError("PASO_REQUIRED", "paso es obligatorio")
+		}
+		if strings.TrimSpace(pasos[i].OwnerSupabaseUserID) != ownerID {
+			return nil, domainErrors.NewValidationError("PASO_OWNER_MISMATCH", "todos los pasos deben pertenecer al mismo usuario")
+		}
+		if err := pasos[i].ValidateForCreate(); err != nil {
+			return nil, err
+		}
+	}
+
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, domainErrors.NewInternalError("PASO_TX_BEGIN_ERROR", "no se pudo iniciar transacción")
+	}
+	defer tx.Rollback(ctx)
+
+	ids := make([]string, 0, len(pasos))
+	for i := range pasos {
+		var id string
+		err := tx.QueryRow(ctx, `
+			INSERT INTO pasos_portico (
+				owner_supabase_user_id,
+				vehiculo_id,
+				portico_id,
+				fecha_hora_paso,
+				latitud,
+				longitud,
+				monto_cobrado,
+				moneda,
+				fuente
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			RETURNING id::text
+		`,
+			pasos[i].OwnerSupabaseUserID,
+			pasos[i].VehiculoID,
+			pasos[i].PorticoID,
+			pasos[i].FechaHoraPaso,
+			pasos[i].Latitud,
+			pasos[i].Longitud,
+			pasos[i].MontoCobrado,
+			pasos[i].Moneda,
+			pasos[i].Fuente,
+		).Scan(&id)
+		if err != nil {
+			return nil, domainErrors.NewInternalError("PASO_CREATE_ERROR", "error al registrar paso de pórtico")
+		}
+		ids = append(ids, id)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, domainErrors.NewInternalError("PASO_TX_COMMIT_ERROR", "no se pudo confirmar transacción")
+	}
+
+	return r.fetchByIDs(ctx, ownerID, ids)
+}
+
 func (r *PasosPostgresRepository) GetByID(ctx context.Context, ownerID, id string) (*entities.PasoPortico, error) {
 	ownerID = strings.TrimSpace(ownerID)
 	id = strings.TrimSpace(id)
@@ -108,6 +176,79 @@ func (r *PasosPostgresRepository) GetByID(ctx context.Context, ownerID, id strin
 	return &out, nil
 }
 
+func (r *PasosPostgresRepository) fetchByIDs(ctx context.Context, ownerID string, ids []string) ([]entities.PasoPortico, error) {
+	if len(ids) == 0 {
+		return []entities.PasoPortico{}, nil
+	}
+
+	placeholders := make([]string, 0, len(ids))
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, ownerID)
+	for i, id := range ids {
+		placeholders = append(placeholders, fmt.Sprintf("$%d", i+2))
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			id::text,
+			owner_supabase_user_id::text,
+			vehiculo_id::text,
+			portico_id::text,
+			fecha_hora_paso,
+			latitud,
+			longitud,
+			monto_cobrado,
+			moneda,
+			fuente,
+			created_at
+		FROM pasos_portico
+		WHERE owner_supabase_user_id = $1
+		  AND id::text IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, domainErrors.NewInternalError("PASO_BATCH_FETCH_ERROR", "error al obtener pasos creados")
+	}
+	defer rows.Close()
+
+	byID := make(map[string]entities.PasoPortico, len(ids))
+	for rows.Next() {
+		var item entities.PasoPortico
+		if err := rows.Scan(
+			&item.ID,
+			&item.OwnerSupabaseUserID,
+			&item.VehiculoID,
+			&item.PorticoID,
+			&item.FechaHoraPaso,
+			&item.Latitud,
+			&item.Longitud,
+			&item.MontoCobrado,
+			&item.Moneda,
+			&item.Fuente,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, domainErrors.NewInternalError("PASO_BATCH_FETCH_SCAN_ERROR", "error al leer pasos creados")
+		}
+		byID[item.ID] = item
+	}
+	if err := rows.Err(); err != nil {
+		return nil, domainErrors.NewInternalError("PASO_BATCH_FETCH_ROWS_ERROR", "error iterando pasos creados")
+	}
+
+	out := make([]entities.PasoPortico, 0, len(ids))
+	for _, id := range ids {
+		item, ok := byID[id]
+		if !ok {
+			return nil, domainErrors.NewInternalError("PASO_BATCH_FETCH_MISSING", "resultado incompleto al leer pasos creados")
+		}
+		out = append(out, item)
+	}
+
+	return out, nil
+}
+
 func (r *PasosPostgresRepository) ListByOwnerRange(
 	ctx context.Context,
 	ownerID string,
@@ -135,24 +276,30 @@ func (r *PasosPostgresRepository) ListByOwnerRange(
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT
-			id::text,
-			owner_supabase_user_id::text,
-			vehiculo_id::text,
-			portico_id::text,
-			fecha_hora_paso,
-			latitud,
-			longitud,
-			monto_cobrado,
-			moneda,
-			fuente,
-			created_at
-		FROM pasos_portico
-		WHERE owner_supabase_user_id = $1
-		  AND fecha_hora_paso >= $2
-		  AND fecha_hora_paso <= $3
-		  AND ($4 = '' OR vehiculo_id::text = $4)
-		  AND ($5 = '' OR portico_id::text = $5)
-		ORDER BY fecha_hora_paso DESC
+			pp.id::text,
+			pp.owner_supabase_user_id::text,
+			pp.vehiculo_id::text,
+			v.patente,
+			pp.portico_id::text,
+			p.codigo,
+			c.nombre AS concesionaria_nombre,
+			pp.fecha_hora_paso,
+			pp.latitud,
+			pp.longitud,
+			pp.monto_cobrado,
+			pp.moneda,
+			pp.fuente,
+			pp.created_at
+		FROM pasos_portico pp
+		JOIN vehiculos v ON v.id = pp.vehiculo_id
+		JOIN porticos p ON p.id = pp.portico_id
+		LEFT JOIN concesionarias c ON c.id = p.concesionaria_id
+		WHERE pp.owner_supabase_user_id = $1
+		  AND pp.fecha_hora_paso >= $2
+		  AND pp.fecha_hora_paso <= $3
+		  AND ($4 = '' OR pp.vehiculo_id::text = $4)
+		  AND ($5 = '' OR pp.portico_id::text = $5)
+		ORDER BY pp.fecha_hora_paso DESC
 		LIMIT $6 OFFSET $7
 	`, ownerID, filter.From, filter.To, vehiculoID, porticoID, limit, offset)
 	if err != nil {
@@ -167,7 +314,91 @@ func (r *PasosPostgresRepository) ListByOwnerRange(
 			&item.ID,
 			&item.OwnerSupabaseUserID,
 			&item.VehiculoID,
+			&item.VehiculoPatente,
 			&item.PorticoID,
+			&item.PorticoCodigo,
+			&item.ConcesionariaNombre,
+			&item.FechaHoraPaso,
+			&item.Latitud,
+			&item.Longitud,
+			&item.MontoCobrado,
+			&item.Moneda,
+			&item.Fuente,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, domainErrors.NewInternalError("PASO_LIST_SCAN_ERROR", "error al leer pasos")
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, domainErrors.NewInternalError("PASO_LIST_ROWS_ERROR", "error iterando pasos")
+	}
+
+	return out, nil
+}
+
+func (r *PasosPostgresRepository) ListAllRange(
+	ctx context.Context,
+	filter repository.ListPasosFilter,
+) ([]entities.PasoPortico, error) {
+	limit := filter.Limit
+	offset := filter.Offset
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	vehiculoID := strings.TrimSpace(filter.VehiculoID)
+	porticoID := strings.TrimSpace(filter.PorticoID)
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+			pp.id::text,
+			pp.owner_supabase_user_id::text,
+			pp.vehiculo_id::text,
+			v.patente,
+			pp.portico_id::text,
+			p.codigo,
+			c.nombre AS concesionaria_nombre,
+			pp.fecha_hora_paso,
+			pp.latitud,
+			pp.longitud,
+			pp.monto_cobrado,
+			pp.moneda,
+			pp.fuente,
+			pp.created_at
+		FROM pasos_portico pp
+		JOIN vehiculos v ON v.id = pp.vehiculo_id
+		JOIN porticos p ON p.id = pp.portico_id
+		LEFT JOIN concesionarias c ON c.id = p.concesionaria_id
+		WHERE pp.fecha_hora_paso >= $1
+		  AND pp.fecha_hora_paso <= $2
+		  AND ($3 = '' OR pp.vehiculo_id::text = $3)
+		  AND ($4 = '' OR pp.portico_id::text = $4)
+		ORDER BY pp.fecha_hora_paso DESC
+		LIMIT $5 OFFSET $6
+	`, filter.From, filter.To, vehiculoID, porticoID, limit, offset)
+	if err != nil {
+		return nil, domainErrors.NewInternalError("PASO_LIST_ERROR", "error al listar pasos")
+	}
+	defer rows.Close()
+
+	out := make([]entities.PasoPortico, 0)
+	for rows.Next() {
+		var item entities.PasoPortico
+		if err := rows.Scan(
+			&item.ID,
+			&item.OwnerSupabaseUserID,
+			&item.VehiculoID,
+			&item.VehiculoPatente,
+			&item.PorticoID,
+			&item.PorticoCodigo,
+			&item.ConcesionariaNombre,
 			&item.FechaHoraPaso,
 			&item.Latitud,
 			&item.Longitud,

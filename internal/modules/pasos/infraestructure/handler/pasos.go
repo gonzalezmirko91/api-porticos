@@ -58,6 +58,35 @@ func (h *PasosHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, out)
 }
 
+func (h *PasosHandler) CreateBatch(c *gin.Context) {
+	ownerID, err := getAuthUserID(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	var req requests.CreatePasoBatchRequest
+	if err := decodeStrictJSON(c, &req); err != nil {
+		respondError(c, err)
+		return
+	}
+	if err := req.Validate(); err != nil {
+		respondError(c, err)
+		return
+	}
+
+	items, err := h.uc.CreateBatch(c.Request.Context(), ownerID, req.Items)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"data":  items,
+		"count": len(items),
+	})
+}
+
 func (h *PasosHandler) GetByID(c *gin.Context) {
 	ownerID, err := getAuthUserID(c)
 	if err != nil {
@@ -103,6 +132,44 @@ func (h *PasosHandler) List(c *gin.Context) {
 	porticoID := strings.TrimSpace(c.Query("porticoId"))
 
 	items, err := h.uc.ListByOwnerRange(c.Request.Context(), ownerID, from, to, vehiculoID, porticoID, limit, offset)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":       items,
+		"limit":      limit,
+		"offset":     offset,
+		"from":       from.Format(time.RFC3339),
+		"to":         to.Format(time.RFC3339),
+		"vehiculoId": vehiculoID,
+		"porticoId":  porticoID,
+	})
+}
+
+func (h *PasosHandler) ListAll(c *gin.Context) {
+	from, to, err := parseRangeQuery(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	limit, err := parseQueryInt(c, "limit", 20)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	offset, err := parseQueryInt(c, "offset", 0)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	vehiculoID := strings.TrimSpace(c.Query("vehiculoId"))
+	porticoID := strings.TrimSpace(c.Query("porticoId"))
+
+	items, err := h.uc.ListAllRange(c.Request.Context(), from, to, vehiculoID, porticoID, limit, offset)
 	if err != nil {
 		respondError(c, err)
 		return

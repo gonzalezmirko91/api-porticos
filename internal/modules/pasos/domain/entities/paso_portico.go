@@ -11,7 +11,10 @@ type PasoPortico struct {
 	ID                  string    `json:"id"`
 	OwnerSupabaseUserID string    `json:"ownerSupabaseUserId"`
 	VehiculoID          string    `json:"vehiculoId"`
+	VehiculoPatente     string    `json:"vehiculoPatente,omitempty"`
 	PorticoID           string    `json:"porticoId"`
+	PorticoCodigo       string    `json:"porticoCodigo,omitempty"`
+	ConcesionariaNombre string    `json:"concesionariaNombre,omitempty"`
 	FechaHoraPaso       time.Time `json:"fechaHoraPaso"`
 	Latitud             *float64  `json:"latitud,omitempty"`
 	Longitud            *float64  `json:"longitud,omitempty"`
