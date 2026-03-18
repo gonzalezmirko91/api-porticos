@@ -122,7 +122,7 @@ func (a *App) Run() error {
 	errCh := make(chan error, 1)
 
 	go func() {
-		logger.Success("Atlas seed iniciado correctamente en puerto " + strconv.Itoa(a.config.Port))
+		logger.Success("Atlas engine iniciado correctamente en puerto " + strconv.Itoa(a.config.Port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}

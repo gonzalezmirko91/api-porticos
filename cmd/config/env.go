@@ -21,7 +21,7 @@ func CargarEnv(environment string) error {
 		return fmt.Errorf("no se pudo setear ENVIRONMENT: %w", err)
 	}
 
-	if appEnv == "dev" || appEnv == "qa" {
+	if appEnv == "dev" || appEnv == "qa" || appEnv == "production" {
 		filename := ".env." + appEnv
 
 		if _, err := os.Stat(filename); err == nil {

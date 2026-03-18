@@ -1,27 +1,26 @@
-# ATLAS Seed - dockerfile
-FROM golang:1.25.5-alpine
+# API Porticos - dockerfile
+FROM golang:1.25.5-alpine AS builder
 
-
-# Instalar dependencias necesarias
 RUN apk update && apk add --no-cache ca-certificates git
 
-#Establecer directorio de trabajo
 WORKDIR /app
 
-# Copiar archivos de dependencias primero
 COPY go.mod go.sum ./
-
 RUN go mod download
 
 COPY . .
 
-# Compilación estática
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o rea/porticos ./cmd/api
+    go build -o /app/api ./cmd/api
 
+FROM alpine:3.20
 
-# Exponer puerto
-EXPOSE 4200
+RUN apk add --no-cache ca-certificates
 
-# Comando por defecto
-CMD ["./api_porticos"]
+WORKDIR /app
+
+COPY --from=builder /app/api /app/api
+
+EXPOSE 3200
+
+CMD ["/app/api"]
