@@ -20,6 +20,12 @@ func NewPostgres(ctx context.Context, host string, port int, user, password, nam
 	if err != nil {
 		return nil, err
 	}
+	cfg.MaxConns = 10
+	cfg.MinConns = 0
+	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.HealthCheckPeriod = 30 * time.Second
+
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 
 	if err != nil {
