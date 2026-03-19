@@ -7,10 +7,8 @@ import (
 	"rea/porticos/internal/modules/kpis/domain/entities"
 	"rea/porticos/internal/modules/kpis/domain/repository"
 	domainErrors "rea/porticos/pkg/errors"
-	"rea/porticos/pkg/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go.uber.org/zap"
 )
 
 type KPIsPostgresRepository struct {
@@ -44,7 +42,6 @@ func (r *KPIsPostgresRepository) GetBasicKPIs(ctx context.Context) (*entities.Ba
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		logger.FromContext(ctx).Error("Error obteniendo KPIs básicos", zap.Error(err))
 		return nil, domainErrors.NewInternalError("KPI_BASIC_QUERY_ERROR", "error al obtener KPIs básicos")
 	}
 
