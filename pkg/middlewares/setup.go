@@ -16,6 +16,7 @@ func Register(router *gin.Engine, opts Options) {
 
 	// Usa solo este recovery centralizado; evita duplicar con gin.Recovery()
 	router.Use(ErrorHandlerMiddleware())
+	router.Use(ErrorLoggerMiddleware())
 
 	router.Use(ginhelmet.Default())
 

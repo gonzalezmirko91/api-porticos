@@ -124,6 +124,7 @@ func decodeStrictJSON(c *gin.Context, target any) error {
 }
 
 func respondError(c *gin.Context, err error) {
+	_ = c.Error(err)
 	status, payload := httpMapper.MapErrorToHttp(err)
 	c.JSON(status, payload)
 }
