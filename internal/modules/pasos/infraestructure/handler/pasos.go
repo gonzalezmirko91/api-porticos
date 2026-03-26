@@ -59,20 +59,6 @@ func (h *PasosHandler) Create(c *gin.Context) {
 }
 
 func (h *PasosHandler) GetByID(c *gin.Context) {
-	ownerID, err := getAuthUserID(c)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-
-	id := strings.TrimSpace(c.Param("id"))
-	out, err := h.uc.GetByID(c.Request.Context(), ownerID, id)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, out)
 }
 
 func (h *PasosHandler) List(c *gin.Context) {
@@ -240,39 +226,6 @@ func (h *PasosHandler) ListCapturadosAll(c *gin.Context) {
 }
 
 func (h *PasosHandler) Summary(c *gin.Context) {
-	ownerID, err := getAuthUserID(c)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-
-	from, to, err := parseRangeQuery(c)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-
-	vehiculoID := strings.TrimSpace(c.Query("vehiculoId"))
-	porticoID := strings.TrimSpace(c.Query("porticoId"))
-	groupBy := strings.TrimSpace(c.Query("groupBy"))
-	if groupBy == "" {
-		groupBy = "day"
-	}
-
-	items, err := h.uc.SummaryByOwnerRange(c.Request.Context(), ownerID, from, to, vehiculoID, porticoID, groupBy)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"data":       items,
-		"groupBy":    strings.ToLower(groupBy),
-		"from":       from.Format(time.RFC3339),
-		"to":         to.Format(time.RFC3339),
-		"vehiculoId": vehiculoID,
-		"porticoId":  porticoID,
-	})
 }
 
 func getAuthUserID(c *gin.Context) (string, error) {

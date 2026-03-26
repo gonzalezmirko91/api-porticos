@@ -54,10 +54,7 @@ func (uc *PasosUseCase) CreateBatch(ctx context.Context, ownerID string, items [
 }
 
 func (uc *PasosUseCase) GetByID(ctx context.Context, ownerID, id string) (*entities.PasoPortico, error) {
-	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(id) == "" {
-		return nil, domainErrors.NewValidationError("PASO_REQUIRED_FIELDS", "usuario e id son obligatorios")
-	}
-	return uc.pasosRepo.GetByID(ctx, ownerID, id)
+	return nil, domainErrors.NewValidationError("PASO_GET_DISABLED", "pasos/:id no está habilitado")
 }
 
 func (uc *PasosUseCase) ListByOwnerRange(
@@ -172,30 +169,5 @@ func (uc *PasosUseCase) SummaryByOwnerRange(
 	from, to time.Time,
 	vehiculoID, porticoID, groupBy string,
 ) ([]entities.ResumenPeriodo, error) {
-	ownerID = strings.TrimSpace(ownerID)
-	if ownerID == "" {
-		return nil, domainErrors.NewValidationError("PASO_OWNER_REQUIRED", "usuario no autenticado")
-	}
-	if from.IsZero() || to.IsZero() {
-		return nil, domainErrors.NewValidationError("PASO_RANGE_REQUIRED", "from y to son obligatorios")
-	}
-	if to.Before(from) {
-		return nil, domainErrors.NewValidationError("PASO_RANGE_INVALID", "to no puede ser menor que from")
-	}
-
-	groupBy = strings.ToLower(strings.TrimSpace(groupBy))
-	switch groupBy {
-	case "day", "week", "month":
-	default:
-		return nil, domainErrors.NewValidationError("PASO_GROUPBY_INVALID", "groupBy debe ser day, week o month")
-	}
-
-	filter := pasosRepository.SummaryPasosFilter{
-		From:       from,
-		To:         to,
-		VehiculoID: strings.TrimSpace(vehiculoID),
-		PorticoID:  strings.TrimSpace(porticoID),
-		GroupBy:    groupBy,
-	}
-	return uc.pasosRepo.SummaryByOwnerRange(ctx, ownerID, filter)
+	return nil, domainErrors.NewValidationError("PASO_RESUMEN_DISABLED", "pasos/resumen no está habilitado")
 }
